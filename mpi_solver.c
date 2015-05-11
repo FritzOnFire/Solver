@@ -22,9 +22,7 @@ int main (int args, char* argv[])
 
 	MPI_Init(NULL, NULL);
 
-	if (name == 0) {
-		begin = clock();
-	}
+	begin = clock();
 
 	MPI_Comm_size(MPI_COMM_WORLD, &present);
 	MPI_Comm_rank(MPI_COMM_WORLD, &name);
@@ -174,6 +172,7 @@ int main (int args, char* argv[])
 					}
 
 					j = j / present;
+					fprintf(stderr, "%d\n", j);
 
 					for (i = 0; i < j * name; i++) {
 						temp = head;
@@ -257,16 +256,24 @@ MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			}
 
 			it++;
-/*			end = clock();
-			if ((double) (end - begin) / CLOCKS_PER_SEC > 20.0) {
-				printf("Took to long. This is how far I got:\n");
-				print_board(head->board);
+			end = clock();
+			if ((double) (end - begin) / CLOCKS_PER_SEC > 10.0) {
+				if (name == 0) {
+					printf("Took to long. This is how far I got:\n");
+					print_board(head->board);
+
+					for (i = 1; i < present; i++) {
+						MAXMOVES[i] = -1;
+					}
+				} else {
+					MAXMOVES[name] = -1;
+				}
 				break;
 			}
-*/		}
+		}
 
 		j = 0;
-		while (j ==  present - 1) {
+		while (j !=  present - 1) {
 			MPI_Send(MAXMOVES, present, MPI_SHORT, (name + 1) % present, 0,
 MPI_COMM_WORLD);
 			MPI_Recv(MAXMOVES, present, MPI_SHORT, (name - 1 + present) % present, 0,
@@ -334,10 +341,10 @@ MPI_COMM_WORLD);
 			}
 
 			free_board(loc_board);
-		} else {
-			printf("Unsolvable!\n");
-			temp = head;
 		}
+	} else {
+		printf("Unsolvable!\n");
+		temp = head;
 	}
 
 	if (temp->move_list != NULL) {
