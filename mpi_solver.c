@@ -22,26 +22,37 @@ int main (int args, char* argv[])
 
 	MPI_Init(NULL, NULL);
 
-	begin = clock();
+	if (name == 0) {
+		begin = clock();
+	}
 
 	MPI_Comm_size(MPI_COMM_WORLD, &present);
 	MPI_Comm_rank(MPI_COMM_WORLD, &name);
 
 	if (args < 3) {
-		printf("Not enough arguments.\n");
-		printf("Format: ./solver <textfile> <0 | 1 | 2> [<output file>]\n");
-		printf("0 = do not print states\n");
-		printf("1 = print to terminal, 2 = print to file\n");
+		if (name == 0) {
+			printf("Not enough arguments.\n");
+			printf("Format: ./solver <textfile> <0 | 1 | 2> [<output file>]\n");
+			printf("0 = do not print states\n");
+			printf("1 = print to terminal, 2 = print to file\n");
+		}
+		MPI_Finalize();
 		return 0;
 	}
 
 	if (argv[2][0] == '2' && args < 4) {
-		printf("Please specify output file.\n");
+		if (name == 0) {
+			printf("Please specify output file.\n");
+		}
+		MPI_Finalize();
 		return 0;
 	}
 
 	if (!(pFile = fopen(argv[1], "r"))) {
+		if (name == 0) {
 		printf("File not found\n");
+		}
+		MPI_Finalize();
 		return 0;
 	}
 
@@ -128,7 +139,8 @@ int main (int args, char* argv[])
 			break;
 		}
 
-		MAXMOVES = malloc(sizeof(short) * present);
+		MAXMOVES = calloc(present, sizeof(short));
+		prop = calloc(present, sizeof(short));
 		MAXMOVES[0] = (size + size) * size * size;
 		for (i = 1; i < present; i++) {
 			MAXMOVES[i] = MAXMOVES[i - 1];
@@ -147,7 +159,7 @@ int main (int args, char* argv[])
 					while (step != NULL) {
 						temp = step;
 						step = step->next;
-						temp = NULL;
+						temp->next = NULL;
 						add_bcl(&holder, &temp);
 					}
 				}
@@ -166,7 +178,7 @@ int main (int args, char* argv[])
 					for (i = 0; i < j * name; i++) {
 						temp = head;
 						head = head->next;
-						temp->next == NULL;
+						temp->next = NULL;
 						free_bcl(&temp);
 					}
 
@@ -174,8 +186,10 @@ int main (int args, char* argv[])
 					for (i = 0; i < j - 1; i++) {
 						step = step->next;
 					}
-					free_bcl(&(step->next));
-					step->next = NULL;
+					if (name + 1 != present) {
+						free_bcl(&(step->next));
+						step->next = NULL;
+					}
 
 					solve(&head);
 				} else {
@@ -205,6 +219,7 @@ MPI_COMM_WORLD);
 					break;
 
 				case 1:
+					fprintf(stderr, "%d has finnished.\n", name);
 					boolean = 1;
 					MAXMOVES[name] = temp->moves;
 					MPI_Send(MAXMOVES, present, MPI_SHORT, (name + 1) % present, 0,
@@ -227,10 +242,12 @@ MPI_COMM_WORLD);
 				MPI_Rsend(MAXMOVES, present, MPI_SHORT, (name + 1) % present, 0,
 MPI_COMM_WORLD);
 			}
-			MPI_Recv(prop, present, MPI_SHORT, (name - 1) % present, 0,
+
+			MPI_Recv(prop, present, MPI_SHORT, (name - 1 + present) % present, 0,
 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
 			for (i = 0; i < present; i++) {
-				if (prop[i] < MAXMOVES[i]) {
+				if (prop[i] < MAXMOVES[i] && i != name) {
 					MAXMOVES[i] = prop[i];
 
 					if (MAXMOVES[i] >= 0 && MAXMOVES[i] < MAXMOVES[name]) {
@@ -249,10 +266,10 @@ MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 */		}
 
 		j = 0;
-		while (j == present - 2) {
+		while (j ==  present - 1) {
 			MPI_Send(MAXMOVES, present, MPI_SHORT, (name + 1) % present, 0,
 MPI_COMM_WORLD);
-			MPI_Recv(MAXMOVES, present, MPI_SHORT, (name - 1) % present, 0,
+			MPI_Recv(MAXMOVES, present, MPI_SHORT, (name - 1 + present) % present, 0,
 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 			j = 0;
@@ -269,7 +286,7 @@ MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			if (name == 0 && name != x) {
 				moves = pop = malloc(sizeof(ml));
 				while (1) {
-					MPI_Recv(&(pop->move), 1, MPI_CHAR, x, 0, MPI_COMM_WORLD,
+					MPI_Recv(&(pop->move), 1, MPI_CHAR, x, 1, MPI_COMM_WORLD,
 MPI_STATUS_IGNORE);
 					if (pop->move == -1) {
 						break;
@@ -282,7 +299,7 @@ MPI_STATUS_IGNORE);
 
 			if (name == i && name != x) {
 				while (temp->move_list != NULL) {
-					MPI_Send(&(temp->move_list->move), 1, MPI_CHAR, 0, 0,
+					MPI_Send(&(temp->move_list->move), 1, MPI_CHAR, 0, 1,
 MPI_COMM_WORLD);
 					pop = temp->move_list;
 					temp->move_list = temp->move_list->next;
@@ -293,34 +310,34 @@ MPI_COMM_WORLD);
 			moves = temp->move_list;
 		}
 
-		MPI_Finalize();
+		if (name == 0) {
+			if (boolean == 1) {
+				if (argv[2][0] != '0') {
+					boolean = argv[2][0] - '0';
 
-		if (boolean == 1) {
-			if (argv[2][0] != '0') {
-				boolean = argv[2][0] - '0';
+					if (boolean == 1) {
+						print_board (loc_board);
+					} else {
+						pFile = fopen(argv[3], "w");
+						store_board (loc_board, pFile);
+					}
 
-				if (boolean == 1) {
-					print_board (loc_board);
-				} else {
-					pFile = fopen(argv[3], "w");
-					store_board (loc_board, pFile);
+					result(loc_board, moves, &y, &x, boolean,
+								pFile);
+
+					if (boolean == 2) {
+						fclose(pFile);
+					}
 				}
-
-				result(loc_board, moves, &y, &x, boolean,
-							pFile);
-
-				if (boolean == 2) {
-					fclose(pFile);
-				}
+				printf("Number of moves required to sort the puzzle: %hd\n",
+						temp->moves);
 			}
-			printf("Number of moves required to sort the puzzle: %hd\n",
-					temp->moves);
-		}
 
-		free_board(loc_board);
-	} else {
-		printf("Unsolvable!\n");
-		temp = head;
+			free_board(loc_board);
+		} else {
+			printf("Unsolvable!\n");
+			temp = head;
+		}
 	}
 
 	if (temp->move_list != NULL) {
@@ -329,11 +346,14 @@ MPI_COMM_WORLD);
 
 	free_bcl(&head);
 
-	end = clock();
-	time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
+	if (name == 0) {
+		end = clock();
+		time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
-	printf("Time taken to solve: %f seconds\n", time_spent);
+		printf("Time taken to solve: %f seconds\n", time_spent);
+	}
 
+	MPI_Finalize();
 	return 0;
 }
 
