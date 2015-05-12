@@ -1,0 +1,48 @@
+\documentclass{article}
+
+\title{(short) Report on N puzzle solver.}
+\author{F Engelbrecht}
+\date{13 May 2015}
+
+\begin{document}
+	\maketitle
+
+	\section{Introduction.}
+
+	The problem is to solve a N puzzle problem in the least amount of moves and
+	to find out what those moves are in the least amount of time.
+
+	\section{Design and Implementation.}
+
+	\subsection{Algorithm for checking unsolvable.}
+
+	Create two Linklists. The first Linklist has two values, weight and value.
+	The first node has a value of 1 and the last node has a value of N*N-1 (N
+	is the board width/height). The weight for each node is 0. Read through 
+	the current board.  As a number is read travers through the linklist 
+	incrementing each node weight until a node with the same value as the 
+	number read. Pop off the value and add it to the second Linklist.
+	\\
+	If N*N is odd and the sum of all the weights in the second Linklist is even
+	then the board is solvable. If N*N is even and the sum of the sum of the
+	weights in the second Linklist and the row position is odd then the board
+	is also solvable. If the board does not fulfill these requirements then the
+	board is unsolvable.
+
+	\subsection{Algorithm for solving.}
+
+	A Linklist is created with the following values. A two dimensional array 
+	that stores the current board state. A value that stores the current weight
+	of the board. A value that stores the amount of moves made by this current
+	state. Two values that store the y and x coordinates of the empty space. A
+	Linklist of previous moves and a pointer to another state in the list.
+	\\
+	The node at the head of the Linklist is popped off and then all possible 
+	moves are played on the board and saved as new states. The states are then
+	added to the Linklist in ascending order determined by the weight. The top 3
+	nodes are then evaluated to see if there are finished boards among them. The
+	process is then repeated until a finished board is found.
+
+	\subsection{}
+
+\end{document}
